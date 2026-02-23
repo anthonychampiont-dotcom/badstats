@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BadStats">
+<meta name="theme-color" content="#0a0e14">
+<link rel="manifest" href="manifest.json">
+<title>BadStats</title>
+<style>
+/* Fallback system fonts when offline - no Google Fonts dependency */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  --bg:      #0a0e14;
+  --surface: #10161f;
+  --card:    #141c28;
+  --border:  #1e2d42;
+  --border2: #253550;
+  --text:    #e2eaf8;
+  --muted:   #4a6080;
+  --muted2:  #6a80a0;
+  --green:   #00e676;
+  --win:     #2979ff;
+  --win-bg:  rgba(41,121,255,.13);
+  --win-bd:  rgba(41,121,255,.38);
+  --lose:    #ff2d55;
+  --lose-bg: rgba(255,45,85,.13);
+  --lose-bd: rgba(255,45,85,.38);
+  --safe-top:    env(safe-area-inset-top,    0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left,   0px);
+  --safe-right:  env(safe-area-inset-right,  0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html { height: 100%; background: var(--bg); }
+body {
+  min-height: 100%; background: var(--bg);
+  color: var(--text); font-family: 'Outfit', sans-serif;
+  display: flex; flex-direction: column;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+  overflow-x: hidden;
+}
+
+/* ═══════════════ CONFIG MODAL ═══════════════ */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  transition: opacity .25s;
+  padding-top: max(16px, var(--safe-top));
+  padding-bottom: max(16px, var(--safe-bottom));
+}
+.overlay.hidden { opacity: 0; pointer-events: none; }
+
+.modal {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 22px;
+  padding: 26px 22px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 40px 80px rgba(0,0,0,.7);
+}
+
+.modal-logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2.2rem; letter-spacing: 4px; color: var(--green);
+  margin-bottom: 2px;
+}
+.modal-sub { color: var(--muted2); font-size: .82rem; margin-bottom: 20px; }
+
+.mode-tabs {
+  display: flex; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 4px; gap: 4px; margin-bottom: 18px;
+}
+.mode-tab {
+  flex: 1; padding: 13px 8px; border: none; border-radius: 9px;
+  font-family: 'Outfit', sans-serif; font-size: .88rem; font-weight: 700;
+  cursor: pointer; transition: all .2s; background: transparent; color: var(--muted); text-align: center;
+}
+.mode-tab .sub { font-size: .68rem; font-weight: 400; opacity: .7; display: block; margin-top: 2px; }
+.mode-tab.active { background: var(--green); color: #000; box-shadow: 0 4px 20px rgba(0,230,118,.25); }
+
+.fg { margin-bottom: 14px; }
+.fg-title { font-size: .65rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); font-weight: 700; margin-bottom: 7px; }
+.fr { display: flex; gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.field label { font-size: .68rem; color: var(--muted2); font-weight: 600; }
+.field input {
+  background: var(--surface); border: 1px solid var(--border2); border-radius: 9px;
+  padding: 12px 13px; color: var(--text); font-family: 'Outfit', sans-serif;
+  font-size: .95rem; outline: none; transition: border-color .15s; width: 100%;
+  -webkit-appearance: none;
+}
+.field input:focus { border-color: #00d4ff; }
+
+.start-btn {
+  width: 100%; padding: 16px; background: var(--green); border: none; border-radius: 12px;
+  color: #000; font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 800;
+  cursor: pointer; transition: all .15s; letter-spacing: .5px; margin-top: 4px;
+  -webkit-appearance: none;
+}
+.start-btn:active { transform: scale(.97); }
+
+/* ═══════════════ APP SHELL ═══════════════ */
+.app { display: flex; flex-direction: column; min-height: 100%; }
+
+/* ─── HEADER ─── */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 14px;
+  flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+/* Score row */
+.score-row {
+  display: flex; align-items: center; justify-content: center; gap: 0;
+  background: var(--card); border: 1px solid var(--border2);
+  border-radius: 14px; padding: 8px 0; overflow: hidden;
+}
+.score-side {
+  flex: 1; text-align: center; padding: 0 12px;
+}
+.score-label {
+  font-size: .68rem; color: var(--muted2); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 120px; margin: 0 auto;
+}
+.score-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 3rem; letter-spacing: 2px; line-height: 1;
+}
+.score-num.ours  { color: var(--win);  }
+.score-num.theirs { color: var(--lose); }
+.score-dash { font-family: 'Bebas Neue', sans-serif; font-size: 2.2rem; color: var(--muted); flex-shrink: 0; }
+.set-pills-header { display: flex; gap: 5px; justify-content: center; flex-wrap: wrap; }
+.set-pill {
+  padding: 2px 10px; border-radius: 20px; border: 1px solid var(--border2);
+  font-family: 'JetBrains Mono', monospace; font-size: .6rem; color: var(--muted);
+}
+.set-pill.cur { border-color: var(--green); color: var(--green); }
+
+/* Action row */
+.action-row {
+  display: flex; gap: 8px; align-items: center; justify-content: space-between;
+}
+.undo-btn {
+  flex: 1; padding: 10px 10px; border-radius: 10px;
+  border: 1.5px solid var(--lose); background: var(--lose-bg);
+  color: var(--lose); font-family: 'Outfit', sans-serif;
+  font-size: .82rem; font-weight: 800; cursor: pointer;
+  transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.undo-btn:active { background: rgba(255,45,85,.3); }
+.hbtn {
+  padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border2);
+  background: transparent; color: var(--muted2); font-family: 'Outfit', sans-serif;
+  font-size: .78rem; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.hbtn:active { background: var(--border); }
+
+/* ─── CONTENT ─── */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── TABS (mobile only) ─── */
+.tabs {
+  display: flex;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tab-btn {
+  flex: 1; padding: 11px 6px; border: none; background: transparent;
+  color: var(--muted2); font-family: 'Outfit', sans-serif;
+  font-size: .78rem; font-weight: 600; cursor: pointer;
+  border-bottom: 2px solid transparent; transition: all .15s;
+}
+.tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
+
+/* ─── PAGES ─── */
+.page { display: none; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.page.active { display: flex; flex-direction: column; }
+.players-page.active { flex-direction: row !important; }
+
+/* ═══════════════ PLAYER CARDS ═══════════════ */
+.players-page {
+  padding: 8px;
+  gap: 8px;
+  flex-direction: row; /* side by side */
+}
+
+.player-card {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.player-header {
+  padding: 8px 10px 6px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.player-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.15rem; letter-spacing: 2px; color: var(--text);
+}
+.player-pts { font-size: .8rem; color: var(--muted2); }
+.player-pts .w { color: var(--win); font-weight: 700; font-size: .9rem; }
+.player-pts .l { color: var(--lose); font-weight: 700; font-size: .9rem; }
+
+.zone-block { overflow: hidden; }
+.zone-title {
+  padding: 5px 10px; font-size: .62rem; font-weight: 800;
+  letter-spacing: 1.2px; text-transform: uppercase;
+  display: flex; align-items: center; gap: 4px;
+}
+.win-zone  .zone-title { background: var(--win-bg);  color: var(--win);  }
+.lose-zone .zone-title { background: var(--lose-bg); color: var(--lose); }
+
+.zone-btns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px; padding: 6px;
+  background: rgba(0,0,0,.15);
+}
+
+.act-btn {
+  padding: 10px 3px;
+  border: 1.5px solid var(--border2); border-radius: 9px;
+  background: var(--surface); color: var(--text);
+  font-family: 'Outfit', sans-serif; font-size: .68rem; font-weight: 600;
+  cursor: pointer; transition: all .12s; text-align: center;
+  line-height: 1.3; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  -webkit-user-select: none; user-select: none; -webkit-appearance: none;
+}
+.act-btn .icon { font-size: 1.1rem; line-height: 1; }
+.act-btn:active { transform: scale(.92); }
+
+.win-zone  .act-btn:active { background: rgba(41,121,255,.25); border-color: var(--win);  }
+.lose-zone .act-btn:active { background: rgba(255,45,85,.25);  border-color: var(--lose); }
+
+/* flash overlay */
+.flash-card {
+  position: absolute; inset: 0; pointer-events: none; border-radius: 16px;
+  opacity: 0; transition: opacity .35s;
+}
+.flash-card.win-f  { background: radial-gradient(circle at center, rgba(41,121,255,.2), transparent 70%); }
+.flash-card.lose-f { background: radial-gradient(circle at center, rgba(255,45,85,.2), transparent 70%); }
+.flash-card.show { opacity: 1; }
+
+/* ═══════════════ STATS PAGE ═══════════════ */
+.stats-page {
+  padding: 10px;
+  gap: 10px;
+  flex-direction: column;
+}
+
+.stats-card {
+  background: var(--card); border: 1px solid var(--border2); border-radius: 14px;
+  overflow: hidden;
+}
+.stats-card-title {
+  padding: 9px 14px; font-size: .65rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  border-bottom: 1px solid var(--border); color: var(--muted2);
+  background: rgba(0,0,0,.2);
+}
+
+.stat-rows { padding: 8px 12px; display: flex; flex-direction: column; gap: 3px; }
+.stat-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 3px; border-radius: 5px; font-size: .78rem;
+}
+.slabel { color: var(--muted2); }
+.sval { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: .8rem; }
+.sval.w { color: var(--win); } .sval.l { color: var(--lose); }
+.sdiv { height: 1px; background: var(--border); margin: 4px 0; }
+
+.pct-block { padding: 4px 12px 10px; }
+.pct-row { display: flex; justify-content: space-between; align-items: center; font-size: .75rem; margin-top:6px; }
+.pct-label { color: var(--muted2); }
+.pct-val { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: .78rem; }
+.pct-val.w { color: var(--win); } .pct-val.l { color: var(--lose); }
+.bar-bg { height: 5px; background: var(--border2); border-radius: 3px; margin-top: 4px; }
+.bar-fill { height: 5px; border-radius: 3px; transition: width .4s ease; }
+
+/* ═══════════════ HISTORY PAGE ═══════════════ */
+.history-page { flex-direction: column; padding: 8px; gap: 4px; }
+
+.rally-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 9px 10px; border-radius: 10px;
+  background: var(--card); border: 1px solid var(--border);
+  font-size: .75rem; flex-shrink: 0;
+}
+.rdot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+.rinfo { flex: 1; min-width: 0; }
+.rnum { font-family: 'JetBrains Mono', monospace; font-size: .65rem; color: var(--muted); margin-right: 4px; }
+.rmain { font-weight: 700; font-size: .78rem; }
+.rmain.w { color: #7cb8ff; } .rmain.l { color: #ff8fa3; }
+.rsub { color: var(--muted2); margin-top: 2px; line-height: 1.45; font-size: .7rem; }
+.rdel {
+  background: none; border: none; color: var(--muted);
+  cursor: pointer; font-size: .95rem; padding: 2px 5px;
+  border-radius: 5px; transition: all .1s; flex-shrink: 0; line-height: 1;
+}
+.rdel:active { color: var(--lose); background: rgba(255,45,85,.15); }
+
+/* Next set btn */
+.next-set-wrap {
+  padding: 10px; flex-shrink: 0;
+  display: flex;
+}
+.next-set-btn {
+  width: 100%; padding: 13px; border-radius: 11px;
+  border: 1.5px solid var(--green); background: rgba(0,230,118,.07);
+  color: var(--green); font-family: 'Outfit', sans-serif;
+  font-size: .88rem; font-weight: 800; cursor: pointer; transition: all .15s;
+}
+.next-set-btn:active { background: rgba(0,230,118,.18); }
+
+/* Single player - full width card */
+.players-page.single-mode .player-card {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+/* ═══════════════ TABLET LANDSCAPE ═══════════════ */
+@media (min-width: 700px) and (orientation: landscape) {
+  .header { padding: 8px 16px; }
+  .score-num { font-size: 2.6rem; }
+  .tabs { display: none; }
+  .content { flex-direction: row; }
+  .page { display: flex !important; }
+
+  /* Players takes 60% */
+  .players-page {
+    width: 60%; flex-direction: row;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  .player-card { flex: 1; }
+
+  /* Stats + history in right 40% */
+  .stats-page, .history-page {
+    width: 20%;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  .history-page { width: 20%; border-right: none; }
+
+  .next-set-wrap { display: none; }
+  .action-row .next-s-header { display: flex !important; }
+}
+
+/* Extra large tablet */
+@media (min-width: 1000px) {
+  .players-page { width: 55%; }
+  .stats-page   { width: 22%; }
+  .history-page { width: 23%; }
+}
+
+/* Next set in header (tablet only) */
+.next-s-header {
+  display: none;
+  padding: 10px 12px; border-radius: 10px;
+  border: 1.5px solid var(--green); background: rgba(0,230,118,.07);
+  color: var(--green); font-family: 'Outfit', sans-serif;
+  font-size: .78rem; font-weight: 800; cursor: pointer;
+  white-space: nowrap;
+}
+.next-s-header:active { background: rgba(0,230,118,.2); }
+
+/* Animations */
+@keyframes pulse-w { 0%,100%{transform:scale(1)} 50%{transform:scale(1.15)} }
+@keyframes pulse-l { 0%,100%{transform:scale(1)} 50%{transform:scale(1.15)} }
+.pulse-w { animation: pulse-w .22s ease; }
+.pulse-l { animation: pulse-l .22s ease; }
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* Export modal */
+.export-ov {
+  position: fixed; inset: 0; background: rgba(0,0,0,.9);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  z-index: 300; display: flex; align-items: center; justify-content: center;
+  padding: 16px; opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.export-ov.active { opacity: 1; pointer-events: all; }
+.export-box {
+  background: var(--card); border: 1px solid var(--border2); border-radius: 16px;
+  padding: 20px; width: 100%; max-width: 520px; max-height: 85vh; overflow-y: auto;
+}
+.export-box h2 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 2px; color: var(--green); font-size: 1.3rem; margin-bottom: 10px; }
+.export-pre {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 10px;
+  font-family: 'JetBrains Mono', monospace; font-size: .58rem; color: var(--text);
+  max-height: 280px; overflow-y: auto; white-space: pre; margin-bottom: 12px;
+}
+.export-actions { display: flex; gap: 9px; justify-content: flex-end; }
+.ebtn { padding: 10px 18px; border-radius: 9px; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: .88rem; cursor: pointer; border: none; }
+.ebtn.sec { background: var(--surface); border: 1px solid var(--border2); color: var(--text); }
+.ebtn.pri { background: var(--green); color: #000; }
+</style>
+</head>
+<body>
+
+<!-- ═══ CONFIG ═══ -->
+<div class="overlay" id="cfg-overlay">
+  <div class="modal">
+    <div class="modal-logo">BadStats</div>
+    <div class="modal-sub">Suivi statistique badminton</div>
+
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="tab-s" onclick="setMode('single')">
+        🏸 Simple <span class="sub">1 joueur</span>
+      </button>
+      <button class="mode-tab" id="tab-d" onclick="setMode('double')">
+        🏸🏸 Double <span class="sub">2 joueurs</span>
+      </button>
+    </div>
+
+    <div class="fg">
+      <div class="fg-title">Nos joueurs</div>
+      <div class="fr">
+        <div class="field"><label>Joueur 1</label><input type="text" id="p1" placeholder="Prénom" value="Joueur 1"></div>
+        <div class="field" id="p2f" style="display:none"><label>Joueur 2</label><input type="text" id="p2" placeholder="Prénom" value="Joueur 2"></div>
+      </div>
+    </div>
+    <div class="fg">
+      <div class="fg-title">Adversaire</div>
+      <div class="fr">
+        <div class="field"><label>Nom / Équipe</label><input type="text" id="opp" placeholder="Adversaire" value="Adversaire"></div>
+      </div>
+    </div>
+    <div class="fg">
+      <div class="fg-title">Informations</div>
+      <div class="fr">
+        <div class="field"><label>Compétition</label><input type="text" id="comp" placeholder="Ex: Régionale 1"></div>
+        <div class="field"><label>Date</label><input type="date" id="dat"></div>
+      </div>
+    </div>
+    <button class="start-btn" onclick="startMatch()">▶ Démarrer le match</button>
+  </div>
+</div>
+
+<!-- ═══ EXPORT ═══ -->
+<div class="export-ov" id="exp-ov">
+  <div class="export-box">
+    <h2>Export des données</h2>
+    <div class="export-pre" id="exp-content"></div>
+    <div class="export-actions">
+      <button class="ebtn sec" onclick="closeExport()">Fermer</button>
+      <button class="ebtn pri" onclick="copyExport()">Copier JSON</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div class="app" id="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <!-- Score -->
+    <div class="score-row">
+      <div class="score-side">
+        <div class="score-label" id="hdr-a">Nous</div>
+        <div class="score-num ours" id="sc-a">0</div>
+      </div>
+      <div class="score-dash">–</div>
+      <div class="score-side">
+        <div class="score-num theirs" id="sc-b">0</div>
+        <div class="score-label" id="hdr-b">Adv</div>
+      </div>
+    </div>
+    <!-- Set pills -->
+    <div class="set-pills-header" id="set-pills"></div>
+    <!-- Actions -->
+    <div class="action-row">
+      <button class="undo-btn" onclick="undoLast()">↩ Annuler</button>
+      <button class="next-s-header" onclick="nextSet()">Set suivant →</button>
+      <button class="hbtn" onclick="openExport()">Export</button>
+      <button class="hbtn" onclick="confirmReset()" style="color:var(--lose);border-color:rgba(255,45,85,.35)">Reset</button>
+    </div>
+  </div>
+
+  <!-- TABS (mobile) -->
+  <div class="tabs" id="tabs">
+    <button class="tab-btn active" onclick="showTab('players')">🏸 Points</button>
+    <button class="tab-btn" onclick="showTab('stats')">📊 Stats</button>
+    <button class="tab-btn" onclick="showTab('history')">📋 Historique</button>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- PLAYERS PAGE -->
+    <div class="page players-page active" id="page-players">
+      <!-- generated -->
+    </div>
+
+    <!-- STATS PAGE -->
+    <div class="page stats-page" id="page-stats">
+      <div class="stats-card">
+        <div class="stats-card-title">Set en cours · Résumé</div>
+        <div class="stat-rows">
+          <div class="stat-row"><span class="slabel">Points totaux</span><div style="display:flex;gap:12px"><span class="sval w" id="s-tw">0</span><span class="sval l" id="s-tl">0</span></div></div>
+          <div class="sdiv"></div>
+          <div class="stat-row" style="color:rgba(41,121,255,.8);font-weight:700;font-size:.7rem;">✅ POINTS GAGNÉS</div>
+          <div class="stat-row"><span class="slabel">Placé (gagné)</span><span class="sval w" id="s-w-pl">0</span></div>
+          <div class="stat-row"><span class="slabel">Smash / Match</span><span class="sval w" id="s-w-ma">0</span></div>
+          <div class="stat-row"><span class="slabel">Erreur adverse</span><span class="sval w" id="s-w-ae">0</span></div>
+          <div class="stat-row"><span class="slabel">Sortie adverse</span><span class="sval w" id="s-w-so">0</span></div>
+          <div class="stat-row"><span class="slabel">Service (gagné)</span><span class="sval w" id="s-w-sv">0</span></div>
+          <div class="sdiv"></div>
+          <div class="stat-row" style="color:rgba(255,45,85,.8);font-weight:700;font-size:.7rem;">❌ POINTS PERDUS</div>
+          <div class="stat-row"><span class="slabel">Filet</span><span class="sval l" id="s-l-fi">0</span></div>
+          <div class="stat-row"><span class="slabel">Hors limite</span><span class="sval l" id="s-l-hl">0</span></div>
+          <div class="stat-row"><span class="slabel">Erreur</span><span class="sval l" id="s-l-er">0</span></div>
+          <div class="stat-row"><span class="slabel">Service (perdu)</span><span class="sval l" id="s-l-sv">0</span></div>
+          <div class="stat-row"><span class="slabel">Placé (adv)</span><span class="sval l" id="s-l-pl">0</span></div>
+          <div class="stat-row"><span class="slabel">Smash adv</span><span class="sval l" id="s-l-ma">0</span></div>
+        </div>
+        <div class="pct-block">
+          <div class="pct-row"><span class="pct-label">% Points construits</span><span class="pct-val w" id="pct-cw">—</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="background:var(--win);width:0%" id="bar-cw"></div></div>
+          <div class="pct-row"><span class="pct-label">% Fautes directes</span><span class="pct-val l" id="pct-fl">—</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="background:var(--lose);width:0%" id="bar-fl"></div></div>
+        </div>
+      </div>
+
+      <!-- Per player stats (doubles) -->
+      <div id="player-stats-cards"></div>
+
+      <!-- Next set mobile -->
+      <div class="next-set-wrap">
+        <button class="next-set-btn" onclick="nextSet()">Fin de set → Set suivant</button>
+      </div>
+    </div>
+
+    <!-- HISTORY PAGE -->
+    <div class="page history-page" id="page-history">
+      <div id="rally-log" style="display:flex;flex-direction:column;gap:4px;flex:1">
+        <div style="text-align:center;color:var(--muted);font-size:.75rem;margin-top:24px;line-height:2">
+          L'historique des points<br>s'affiche ici.
+        </div>
+      </div>
+      <div class="next-set-wrap">
+        <button class="next-set-btn" onclick="nextSet()">Fin de set → Set suivant</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════ DEFINITIONS ══════════════════════════ */
+const WIN_ACTIONS = [
+  { key:'place',   icon:'🎯', label:'Placé'          },
+  { key:'match',   icon:'💥', label:'Smash/Match'    },
+  { key:'adverr',  icon:'⚡', label:'Erreur adv.'    },
+  { key:'sortie',  icon:'📐', label:'Sortie adv.'    },
+  { key:'service', icon:'🏸', label:'Service'        },
+];
+const LOSE_ACTIONS = [
+  { key:'filet',   icon:'🕸️', label:'Filet'         },
+  { key:'hl',      icon:'📏', label:'Hors limite'    },
+  { key:'err',     icon:'⚠️',  label:'Erreur'        },
+  { key:'service', icon:'🚫', label:'Service'        },
+  { key:'place',   icon:'🎯', label:'Placé (adv)'    },
+  { key:'match',   icon:'💥', label:'Smash adv'      },
+];
+const WIN_LBL  = { place:'Placé (gagné)', match:'Smash/Match', adverr:'Erreur adverse', sortie:'Sortie adverse', service:'Service (gagné)' };
+const LOSE_LBL = { filet:'Filet', hl:'Hors limite', err:'Erreur', service:'Service (perdu)', place:'Placé (adv)', match:'Smash adv' };
+
+/* ══════════════════════════ STATE ══════════════════════════ */
+const S = {
+  mode: 'single',
+  players: ['Joueur 1'],
+  opponent: 'Adversaire',
+  info: {},
+  currentSet: 1,
+  sets: [{ rallies: [] }],
+  scoreA: 0,
+  scoreB: 0,
+  rallyId: 0,
+};
+
+document.getElementById('dat').valueAsDate = new Date();
+
+/* ══════════════════════════ CONFIG ══════════════════════════ */
+let uiMode = 'single';
+function setMode(m) {
+  uiMode = m;
+  document.getElementById('tab-s').classList.toggle('active', m === 'single');
+  document.getElementById('tab-d').classList.toggle('active', m === 'double');
+  document.getElementById('p2f').style.display = m === 'double' ? '' : 'none';
+}
+
+function startMatch() {
+  S.mode = uiMode;
+  S.players = [document.getElementById('p1').value.trim() || 'Joueur 1'];
+  if (S.mode === 'double') S.players.push(document.getElementById('p2').value.trim() || 'Joueur 2');
+  S.opponent = document.getElementById('opp').value.trim() || 'Adversaire';
+  S.info = { competition: document.getElementById('comp').value, date: document.getElementById('dat').value, mode: S.mode };
+
+  document.getElementById('hdr-a').textContent = S.mode === 'single' ? S.players[0] : S.players.join(' & ');
+  document.getElementById('hdr-b').textContent = S.opponent;
+  document.getElementById('cfg-overlay').classList.add('hidden');
+  buildCards();
+  refreshAll();
+}
+
+/* ══════════════════════════ BUILD CARDS ══════════════════════════ */
+function buildCards() {
+  const area = document.getElementById('page-players');
+  area.innerHTML = '';
+  // Add class for single vs double layout
+  area.classList.toggle('single-mode', S.mode === 'single');
+  S.players.forEach((name, idx) => {
+    const card = document.createElement('div');
+    card.className = 'player-card';
+    card.id = `card-${idx}`;
+    card.style.position = 'relative';
+    card.innerHTML = `
+      <div class="player-header">
+        <div class="player-name">${name}</div>
+        <div class="player-pts">
+          <span class="w" id="pw-${idx}">0</span>W &nbsp; <span class="l" id="pl-${idx}">0</span>L
+        </div>
+      </div>
+      <div class="zone-block win-zone">
+        <div class="zone-title">✅ Points gagnés</div>
+        <div class="zone-btns">
+          ${WIN_ACTIONS.map(a=>`
+            <button class="act-btn" onclick="rec(${idx},'win','${a.key}')">
+              <span class="icon">${a.icon}</span>${a.label}
+            </button>`).join('')}
+        </div>
+      </div>
+      <div class="zone-block lose-zone">
+        <div class="zone-title">❌ Points perdus</div>
+        <div class="zone-btns">
+          ${LOSE_ACTIONS.map(a=>`
+            <button class="act-btn" onclick="rec(${idx},'lose','${a.key}')">
+              <span class="icon">${a.icon}</span>${a.label}
+            </button>`).join('')}
+        </div>
+      </div>
+      <div class="flash-card" id="fl-${idx}"></div>
+    `;
+    area.appendChild(card);
+  });
+}
+
+/* ══════════════════════════ RECORD ══════════════════════════ */
+function rec(playerIdx, result, action) {
+  const rally = {
+    id: ++S.rallyId,
+    set: S.currentSet,
+    player: playerIdx,
+    playerName: S.players[playerIdx],
+    result, action,
+    timestamp: Date.now(),
+  };
+  S.sets[S.currentSet-1].rallies.push(rally);
+  if (result === 'win') S.scoreA++; else S.scoreB++;
+  flashCard(playerIdx, result);
+  pulseScore(result);
+  refreshAll();
+}
+
+function flashCard(idx, result) {
+  const el = document.getElementById(`fl-${idx}`);
+  if (!el) return;
+  el.className = `flash-card ${result==='win'?'win-f':'lose-f'}`;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 350);
+}
+
+function pulseScore(result) {
+  const el = document.getElementById(result==='win'?'sc-a':'sc-b');
+  const cls = result==='win'?'pulse-w':'pulse-l';
+  el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+  setTimeout(()=>el.classList.remove(cls), 280);
+}
+
+/* ══════════════════════════ DELETE / UNDO ══════════════════════════ */
+function delRally(id) {
+  let r = null;
+  S.sets.forEach(s=>{
+    const i = s.rallies.findIndex(x=>x.id===id);
+    if (i!==-1) r = s.rallies.splice(i,1)[0];
+  });
+  if (!r) return;
+  if (r.result==='win') S.scoreA=Math.max(0,S.scoreA-1);
+  else S.scoreB=Math.max(0,S.scoreB-1);
+  refreshAll();
+}
+
+function undoLast() {
+  for (let i=S.sets.length-1;i>=0;i--) {
+    if (S.sets[i].rallies.length) { delRally(S.sets[i].rallies[S.sets[i].rallies.length-1].id); return; }
+  }
+}
+
+/* ══════════════════════════ TABS ══════════════════════════ */
+function showTab(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  const map = { players:0, stats:1, history:2 };
+  document.querySelectorAll('.tab-btn')[map[name]].classList.add('active');
+}
+
+/* ══════════════════════════ REFRESH ══════════════════════════ */
+function refreshAll() {
+  // Header score
+  document.getElementById('sc-a').textContent = S.scoreA;
+  document.getElementById('sc-b').textContent = S.scoreB;
+  // Set pills
+  document.getElementById('set-pills').innerHTML = S.sets.map((s,i)=>{
+    const w=s.rallies.filter(r=>r.result==='win').length;
+    const l=s.rallies.filter(r=>r.result==='lose').length;
+    return `<div class="set-pill ${(i+1)===S.currentSet?'cur':''}">S${i+1}: ${w}–${l}</div>`;
+  }).join('');
+  // Player pts
+  const rs = S.sets[S.currentSet-1].rallies;
+  S.players.forEach((_,idx)=>{
+    const mine = rs.filter(r=>r.player===idx);
+    const we = document.getElementById(`pw-${idx}`); if(we) we.textContent=mine.filter(r=>r.result==='win').length;
+    const le = document.getElementById(`pl-${idx}`); if(le) le.textContent=mine.filter(r=>r.result==='lose').length;
+  });
+  updateStats(rs);
+  renderHistory(rs);
+  renderPlayerStatsCards();
+}
+
+/* ══════════════════════════ STATS ══════════════════════════ */
+function updateStats(rs) {
+  const wins=rs.filter(r=>r.result==='win');
+  const loses=rs.filter(r=>r.result==='lose');
+  const cw=k=>wins.filter(r=>r.action===k).length;
+  const cl=k=>loses.filter(r=>r.action===k).length;
+  document.getElementById('s-tw').textContent=wins.length;
+  document.getElementById('s-tl').textContent=loses.length;
+  document.getElementById('s-w-pl').textContent=cw('place');
+  document.getElementById('s-w-ma').textContent=cw('match');
+  document.getElementById('s-w-ae').textContent=cw('adverr');
+  document.getElementById('s-w-so').textContent=cw('sortie');
+  document.getElementById('s-w-sv').textContent=cw('service');
+  document.getElementById('s-l-fi').textContent=cl('filet');
+  document.getElementById('s-l-hl').textContent=cl('hl');
+  document.getElementById('s-l-er').textContent=cl('err');
+  document.getElementById('s-l-sv').textContent=cl('service');
+  document.getElementById('s-l-pl').textContent=cl('place');
+  document.getElementById('s-l-ma').textContent=cl('match');
+  const total=rs.length;
+  if(total>0){
+    const c=Math.round(((cw('place')+cw('match'))/total)*100);
+    const f=Math.round(((cl('filet')+cl('hl')+cl('err')+cl('service'))/total)*100);
+    document.getElementById('pct-cw').textContent=c+'%';
+    document.getElementById('pct-fl').textContent=f+'%';
+    document.getElementById('bar-cw').style.width=c+'%';
+    document.getElementById('bar-fl').style.width=f+'%';
+  } else {
+    ['pct-cw','pct-fl'].forEach(id=>document.getElementById(id).textContent='—');
+    ['bar-cw','bar-fl'].forEach(id=>document.getElementById(id).style.width='0%');
+  }
+}
+
+function renderPlayerStatsCards() {
+  if (S.mode !== 'double') { document.getElementById('player-stats-cards').innerHTML=''; return; }
+  const allRs = S.sets.flatMap(s=>s.rallies);
+  document.getElementById('player-stats-cards').innerHTML = S.players.map((name,idx)=>{
+    const mine = allRs.filter(r=>r.player===idx);
+    const w=mine.filter(r=>r.result==='win').length;
+    const l=mine.filter(r=>r.result==='lose').length;
+    const cw=k=>mine.filter(r=>r.result==='win'&&r.action===k).length;
+    const cl=k=>mine.filter(r=>r.result==='lose'&&r.action===k).length;
+    return `<div class="stats-card" style="margin-top:10px">
+      <div class="stats-card-title">${name} — Total match</div>
+      <div class="stat-rows">
+        <div class="stat-row"><span class="slabel">Points</span><div style="display:flex;gap:12px"><span class="sval w">${w}</span><span class="sval l">${l}</span></div></div>
+        <div class="sdiv"></div>
+        <div class="stat-row"><span class="slabel">Placé</span><div style="display:flex;gap:12px"><span class="sval w">${cw('place')}</span><span class="sval l">${cl('place')}</span></div></div>
+        <div class="stat-row"><span class="slabel">Smash/Match</span><div style="display:flex;gap:12px"><span class="sval w">${cw('match')}</span><span class="sval l">${cl('match')}</span></div></div>
+        <div class="stat-row"><span class="slabel">Filet</span><span class="sval l">${cl('filet')}</span></div>
+        <div class="stat-row"><span class="slabel">Hors limite</span><span class="sval l">${cl('hl')}</span></div>
+        <div class="stat-row"><span class="slabel">Service (perdu)</span><span class="sval l">${cl('service')}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ══════════════════════════ HISTORY ══════════════════════════ */
+function renderHistory(rs) {
+  const el = document.getElementById('rally-log');
+  if (!rs.length) {
+    el.innerHTML='<div style="text-align:center;color:var(--muted);font-size:.75rem;margin-top:24px;line-height:2">Aucun point<br>dans ce set.</div>';
+    return;
+  }
+  const dotC = r => r.result==='win'?'#2979ff':'#ff2d55';
+  const aLabel = r => r.result==='win'?(WIN_LBL[r.action]||r.action):(LOSE_LBL[r.action]||r.action);
+  el.innerHTML = [...rs].reverse().map(r=>`
+    <div class="rally-item">
+      <div class="rdot" style="background:${dotC(r)}"></div>
+      <div class="rinfo">
+        <span class="rnum">#${r.id}</span>
+        <span class="rmain ${r.result==='win'?'w':'l'}">${r.result==='win'?'✅ Gagné':'❌ Perdu'}</span>
+        <div class="rsub">${aLabel(r)}${S.mode==='double'?' · '+r.playerName:''}</div>
+      </div>
+      <button class="rdel" onclick="delRally(${r.id})">✕</button>
+    </div>
+  `).join('');
+}
+
+/* ══════════════════════════ SET / EXPORT / RESET ══════════════════════════ */
+function nextSet() {
+  S.currentSet++;
+  if (!S.sets[S.currentSet-1]) S.sets.push({rallies:[]});
+  refreshAll();
+  showTab('players');
+}
+
+function openExport() {
+  const pStats = S.players.map((name,idx)=>{
+    const all=S.sets.flatMap(s=>s.rallies).filter(r=>r.player===idx);
+    const cw=k=>all.filter(r=>r.result==='win'&&r.action===k).length;
+    const cl=k=>all.filter(r=>r.result==='lose'&&r.action===k).length;
+    return { player:name,
+      wins:all.filter(r=>r.result==='win').length,
+      losses:all.filter(r=>r.result==='lose').length,
+      winDetail:{place:cw('place'),match:cw('match'),adverr:cw('adverr'),sortie:cw('sortie'),service:cw('service')},
+      lossDetail:{filet:cl('filet'),horsLimite:cl('hl'),erreur:cl('err'),service:cl('service'),place:cl('place'),match:cl('match')},
+    };
+  });
+  document.getElementById('exp-content').textContent = JSON.stringify({
+    matchInfo:{...S.info,players:S.players,opponent:S.opponent},
+    totals:{us:S.scoreA,them:S.scoreB},
+    playerStats:pStats,
+    sets:S.sets.map((s,i)=>({set:i+1,us:s.rallies.filter(r=>r.result==='win').length,them:s.rallies.filter(r=>r.result==='lose').length,rallies:s.rallies})),
+  },null,2);
+  document.getElementById('exp-ov').classList.add('active');
+}
+function closeExport(){document.getElementById('exp-ov').classList.remove('active')}
+function copyExport(){navigator.clipboard.writeText(document.getElementById('exp-content').textContent).then(()=>alert('Copié !'))}
+function confirmReset(){
+  if(!confirm('Remettre le match à zéro ?')) return;
+  S.sets=[{rallies:[]}];S.currentSet=1;S.scoreA=0;S.scoreB=0;S.rallyId=0;
+  buildCards();
+  refreshAll();
+  showTab('players');
+}
+</script>
+<script>
+// ── SERVICE WORKER (PWA offline) ──
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('SW registered'))
+      .catch(err => console.log('SW error:', err));
+  });
+}
+</script>
+</body>
+</html>
