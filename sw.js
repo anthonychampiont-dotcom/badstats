@@ -1,7 +1,7 @@
 // BadStats Service Worker - v1.0
 // Cache everything for full offline support
 
-const CACHE_NAME = 'badstats-v1';
+const CACHE_NAME = 'badstats-v5';
 const ASSETS = [
   './',
   './index.html',
